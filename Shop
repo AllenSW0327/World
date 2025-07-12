@@ -1,0 +1,28 @@
+cost:
+            await interaction.response.send_message(f"돈이 부족합니다! {cost}골드가 필요해요.", ephemeral=True)
+            return
+
+        user["money"] -= cost
+        if upgrade_type == "income":
+            user["income_level"] += amount
+            msg = f"수익 레벨이 {amount}만큼 상승했습니다! 현재 레벨: {user['income_level']}"
+        else:
+            user["military"] += amount * 10
+            msg = f"군사력이 {amount*10}만큼 증가했습니다! 현재 군사력: {user['military']}"
+
+        save_data(data)
+        await interaction.response.send_message(msg, ephemeral=True)
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"{bot.user} 작동 중!")
+
+@bot.tree.command(name="상점", description="나라 키우기 상점에 입장합니다.")
+async def shop(interaction: discord.Interaction):
+    embed = discord.Embed(title="🏪 나라 키우기 상점", description="원하는 버튼을 눌러 강화하세요!", color=0x00ff00)
+    embed.add_field(name="수익 강화", value="+1: 200골드\n+5: 1000골드\n+10: 2000골드", inline=True)
+    embed.add_field(name="군사 강화", value="+1: 150골드\n+5: 700골드\n+10: 1300골드", inline=True)
+    await interaction.response.send_message(embed=embed, view=ShopView(str(interaction.user.id)), ephemeral=True)
+
+bot.run(os.getenv("TOKEN"))
