@@ -1,0 +1,256 @@
+import discord
+from discord.ext import commands
+import os
+import json
+import time
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+DATA_FILE = "data.json"
+WAR_FILE = "war.json"
+
+# 데이터 불러오기/저장 함수
+def load_data():
+    try:
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
+
+def load_war():
+    try:
+        with open(WAR_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_war(war_data):
+    with open(WAR_FILE, "w") as f:
+        json.dump(war_data, f)
+
+# 유저 기본 정보 가져오기
+def get_user(data, user_id):
+    if user_id not in data:
+        data[user_id] = {
+            "money": 0,
+            "base_income": 100,
+            "extra_income": 0,
+            "military": 0,
+            "last_income_time": 0,
+            "alliance": None
+        }
+    return data[user_id]
+
+# 상점 관련 상수
+COST_PER_INCOME = 200
+INCOME_INCREASE = 50
+COST_PER_MILITARY = 150
+MILITARY_INCREASE = 10
+
+# 수익 명령어
+@bot.command()
+async def 수익(ctx):
+    data = load_data()
+    user = get_user(data, str(ctx.author.id))
+    now = time.time()
+    if now - user["last_income_time"] < 3600:
+        await ctx.send("⏰ 1시간에 한 번만 수익을 받을 수 있어요!")
+        return
+    total_income = user["base_income"] + user["extra_income"]
+    user["money"] += total_income
+    user["last_income_time"] = now
+    save_data(data)
+    await ctx.send(f"💰 {ctx.author.mention}, {total_income}골드를 획득했습니다!")
+
+# 정보 명령어
+@bot.command()
+async def 정보(ctx):
+    data = load_data()
+    user = get_user(data, str(ctx.author.id))
+    embed = discord.Embed(title=f"{ctx.author.name}의 국가 정보", color=0x00ff00)
+    embed.add_field(name="💰 자금", value=f"{user['money']} 골드")
+    embed.add_field(name="💵 기본 수익", value=f"{user['base_income']}")
+    embed.add_field(name="📈 추가 수익", value=f"{user['extra_income']}")
+    embed.add_field(name="🔫 군사력", value=f"{user['military']}")
+    embed.add_field(name="🤝 동맹", value=f"<@{user['alliance']}>" if user["alliance"] else "없음")
+    await ctx.send(embed=embed)
+
+# 동맹 명령어
+@bot.command()
+async def 동맹(ctx, 대상: discord.Member):
+    data = load_data()
+    user = get_user(data, str(ctx.author.id))
+    target = get_user(data, str(대상.id))
+    if user["alliance"] or target["alliance"]:
+        await ctx.send("둘 중 한 명이 이미 동맹 중입니다.")
+        return
+    user["alliance"] = str(대상.id)
+    target["alliance"] = str(ctx.author.id)
+    save_data(data)
+    await ctx.send(f"{ctx.author.mention}님과 {대상.mention}님이 동맹을 맺었습니다!")
+
+# 전쟁 명령어
+@bot.command()
+async def 전쟁(ctx, 대상: discord.Member):
+    data = load_data()
+    war_data = load_war()
+    attacker_id = str(ctx.author.id)
+    defender_id = str(대상.id)
+    if attacker_id == defender_id:
+        await ctx.send("자기 자신과 전쟁할 수 없습니다.")
+        return
+    attacker = get_user(data, attacker_id)
+    defender = get_user(data, defender_id)
+    if attacker["alliance"] == defender_id:
+        await ctx.send("동맹과는 전쟁할 수 없습니다!")
+        return
+    war_data["active_war"] = {
+        "attacker": attacker_id,
+        "defender": defender_id,
+        "attacker_support": [],
+        "defender_support": [],
+        "start_time": time.time()
+    }
+    save_war(war_data)
+    await ctx.send(f"⚔️ {ctx.author.mention}님이 {대상.mention}님에게 전쟁을 선포했습니다!\n동맹은 `!참전 @플레이어`로 참전할 수 있습니다.\n10분 후 `!결전`으로 결과를 확인할 수 있습니다.")
+
+# 참전 명령어
+@bot.command()
+async def 참전(ctx, 대상: discord.Member):
+    war_data = load_war()
+    data = load_data()
+    user_id = str(ctx.author.id)
+    target_id = str(대상.id)
+    if "active_war" not in war_data:
+        await ctx.send("현재 진행 중인 전쟁이 없습니다.")
+        return
+    user = get_user(data, user_id)
+    if user["alliance"] != target_id:
+        await ctx.send("이 유저의 동맹이 아닙니다.")
+        return
+    if war_data["active_war"]["attacker"] == target_id:
+        if user_id not in war_data["active_war"]["attacker_support"]:
+            war_data["active_war"]["attacker_support"].append(user_id)
+            save_war(war_data)
+            await ctx.send(f"{ctx.author.mention}님이 공격 측으로 참전했습니다!")
+        else:
+            await ctx.send("이미 참전했습니다.")
+    elif war_data["active_war"]["defender"] == target_id:
+        if user_id not in war_data["active_war"]["defender_support"]:
+            war_data["active_war"]["defender_support"].append(user_id)
+            save_war(war_data)
+            await ctx.send(f"{ctx.author.mention}님이 수비 측으로 참전했습니다!")
+        else:
+            await ctx.send("이미 참전했습니다.")
+    else:
+        await ctx.send("그 유저는 전쟁 당사자가 아닙니다.")
+
+# 결전 명령어 (10분 제한)
+@bot.command()
+async def 결전(ctx):
+    war_data = load_war()
+    data = load_data()
+    if "active_war" not in war_data:
+        await ctx.send("현재 진행 중인 전쟁이 없습니다.")
+        return
+    war = war_data["active_war"]
+    now = time.time()
+    if now - war["start_time"] < 600:
+        남은시간 = int(600 - (now - war["start_time"]))
+        await ctx.send(f"⏳ 결전은 전쟁 시작 10분 후에 가능합니다. 남은 시간: {남은시간}초")
+        return
+    attacker_id = war["attacker"]
+    defender_id = war["defender"]
+    attacker_power = get_user(data, attacker_id)["military"]
+    for uid in war["attacker_support"]:
+        attacker_power += get_user(data, uid)["military"]
+    defender_power = get_user(data, defender_id)["military"]
+    for uid in war["defender_support"]:
+        defender_power += get_user(data, uid)["military"]
+    result_msg = ""
+    if attacker_power > defender_power:
+        reward = 300
+        get_user(data, attacker_id)["money"] += reward
+        get_user(data, defender_id)["money"] = max(0, get_user(data, defender_id)["money"] - reward)
+        result_msg = f"⚔️ 공격 측 승리!\n<@{attacker_id}>가 {reward}골드를 얻었습니다!"
+    elif defender_power > attacker_power:
+        penalty = 150
+        get_user(data, attacker_id)["money"] = max(0, get_user(data, attacker_id)["money"] - penalty)
+        result_msg = f"🛡️ 수비 측 승리!\n<@{attacker_id}>가 {penalty}골드를 잃었습니다!"
+    else:
+        result_msg = "⚖️ 전쟁이 무승부로 끝났습니다."
+    del war_data["active_war"]
+    save_data(data)
+    save_war(war_data)
+    await ctx.send(result_msg)
+
+# 상점 기능 - 수익, 군사 강화
+class ShopView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+
+    async def purchase(self, interaction, kind, amount):
+        data = load_data()
+        user = get_user(data, self.user_id)
+
+        if kind == "income":
+            cost = COST_PER_INCOME * amount
+            if user["money"] >= cost:
+                user["money"] -= cost
+                user["extra_income"] += INCOME_INCREASE * amount
+                await interaction.response.send_message(f"✅ 수익이 {INCOME_INCREASE * amount} 증가!", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ 돈이 부족합니다.", ephemeral=True)
+
+        elif kind == "military":
+            cost = COST_PER_MILITARY * amount
+            if user["money"] >= cost:
+                user["money"] -= cost
+                user["military"] += MILITARY_INCREASE * amount
+                await interaction.response.send_message(f"✅ 군사력이 {MILITARY_INCREASE * amount} 증가!", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ 돈이 부족합니다.", ephemeral=True)
+
+        save_data(data)
+
+    @discord.ui.button(label="+1 수익 강화 (200골드)", style=discord.ButtonStyle.green)
+    async def income_1(self, interaction, button):
+        if str(interaction.user.id) == self.user_id:
+            await self.purchase(interaction, "income", 1)
+        else:
+            await interaction.response.send_message("이 버튼은 당신의 것이 아닙니다.", ephemeral=True)
+
+    @discord.ui.button(label="+5 수익 강화 (1000골드)", style=discord.ButtonStyle.green)
+    async def income_5(self, interaction, button):
+        if str(interaction.user.id) == self.user_id:
+            await self.purchase(interaction, "income", 5)
+        else:
+            await interaction.response.send_message("이 버튼은 당신의 것이 아닙니다.", ephemeral=True)
+
+    @discord.ui.button(label="+1 군사 강화 (150골드)", style=discord.ButtonStyle.blurple)
+    async def military_1(self, interaction, button):
+        if str(interaction.user.id) == self.user_id:
+            await self.purchase(interaction, "military", 1)
+        else:
+            await interaction.response.send_message("이 버튼은 당신의 것이 아닙니다.", ephemeral=True)
+
+    @discord.ui.button(label="+5 군사 강화 (750골드)", style=discord.ButtonStyle.blurple)
+    async def military_5(self, interaction, button):
+        if str(interaction.user.id) == self.user_id:
+            await self.purchase(interaction, "military", 5)
+        else:
+            await interaction.response.send_message("이 버튼은 당신의 것이 아닙니다.", ephemeral=True)
+
+@bot.command()
+async def 상점(ctx):
+    await ctx.send("🏪 나라 상점", view=ShopView(str(ctx.author.id)))
+
+# 봇 실행
+bot.run(os.getenv("TOKEN"))
