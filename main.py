@@ -12,4 +12,4 @@ async def on_ready():
 async def 안녕(ctx):
     await ctx.send("안녕하세요!")
 
-bot.run(os.getenv("TOKEN"))
+bot.run(os.getenv("MTM5MzQ5NjYwMzg5MjkwODEwMw.GdS2Iq.U9lDwuspQIpDNCDXBDlQBc5kZtTsvw1e2S8n_U"))
