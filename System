@@ -253,4 +253,4 @@ async def 상점(ctx):
     await ctx.send("🏪 나라 상점", view=ShopView(str(ctx.author.id)))
 
 # 봇 실행
-bot.run(os.getenv("TOKEN"))
+bot.run(os.getenv("MTM5MzQ5NjYwMzg5MjkwODEwMw.GdS2Iq.U9lDwuspQIpDNCDXBDlQBc5kZtTsvw1e2S8n_U"))
