@@ -182,4 +182,4 @@ async def 나라생성(ctx, *, 나라이름: str):
 
     await ctx.send(f"{ctx.author.mention} 국가 '{나라이름}' ({grade}) 생성 완료! 채널 {new_channel.mention} 이(가) 만들어졌고 역할 '{role_name}' 이 부여되었습니다! 🎉")
 
-bot.run(os.getenv("TOKEN"))
+bot.run(os.getenv("MTM5MzQ5NjYwMzg5MjkwODEwMw.GdS2Iq.U9lDwuspQIpDNCDXBDlQBc5kZtTsvw1e2S8n_U"))
