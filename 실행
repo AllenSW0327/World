@@ -21,4 +21,4 @@ async def on_ready():
                     print("채널에 메시지를 보내는 데 실패했어요")
                 return  # 한 번만 보내고 끝내기
 
-client.run(os.environ["MTM5MzQ5NjYwMzg5MjkwODEwMw.GdS2Iq.U9lDwuspQIpDNCDXBDlQBc5kZtTsvw1e2S8n_U"])
+client.run("MTM5MzQ5NjYwMzg5MjkwODEwMw"])
